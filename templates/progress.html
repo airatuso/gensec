@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Генерация сертификатов</h2>
+<div class="progress">
+    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+</div>
+<script>
+    var source = new EventSource("{{ url_for('progress') }}");
+    source.onmessage = function(event) {
+        var data = event.data;
+        $("#progress-bar").css("width", data + "%");
+        $("#progress-bar").text(data + "%");
+        if (data == "100") {
+            source.close();
+            window.location.href = "{{ url_for('generate_certificates') }}";
+        }
+    };
+</script>
+{% endblock %}

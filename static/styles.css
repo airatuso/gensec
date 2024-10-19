@@ -2,50 +2,41 @@ body {
     font-family: 'Manrope', sans-serif;
     margin: 0;
     padding: 0;
-    text-align: center;
 }
 
-h1 {
+h1, h2 {
     font-weight: 600;
     margin-top: 20px;
 }
 
-form {
-    display: inline-block;
+.jumbotron {
+    background-color: #f8f9fa;
+    padding: 2rem 1rem;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.alert {
     margin-top: 20px;
 }
 
-input[type="file"], input[type="number"], select, input[type="color"] {
-    margin-bottom: 10px;
-}
-
-.btn {
-    display: inline-block;
-    padding: 10px 20px;
-    background-color: #007BFF;
-    color: #fff;
-    text-decoration: none;
-    border-radius: 5px;
-    margin-top: 10px;
-}
-
-.link {
-    display: block;
+#template {
+    border: 1px solid #ccc;
     margin-top: 20px;
-    color: #007BFF;
-    text-decoration: none;
-}
-
-.alerts {
-    color: red;
-    list-style-type: none;
 }
 
 .draggable {
     font-weight: bold;
+    text-align: center;
 }
 
-#template {
+.progress {
+    height: 30px;
     margin-top: 20px;
-    border: 1px solid #000;
+}
+
+.progress-bar {
+    line-height: 30px;
 }

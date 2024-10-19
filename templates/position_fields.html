@@ -1,72 +1,134 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Расположение Полей</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        #template {
-            position: relative;
-            width: 800px;
-            height: 600px;
-            background-image: url("{{ url_for('static', filename='uploads/' + template_filename) }}");
-            background-size: cover;
-            margin: auto;
-        }
-        .draggable {
-            position: absolute;
-            cursor: move;
-            background-color: rgba(255, 255, 255, 0.5);
-            padding: 5px;
-            border: 1px dashed #000;
-        }
-    </style>
-</head>
-<body>
-    <h1>Расположите Поля на Шаблоне</h1>
-    <div id="template">
-        {% for field in fields %}
-            <div class="draggable" id="{{ field }}">{{ field }}</div>
-        {% endfor %}
-    </div>
-    <form method="post">
-        {% for field in fields %}
-            <input type="hidden" name="pos_x_{{ field }}" id="input_x_{{ field }}">
-            <input type="hidden" name="pos_y_{{ field }}" id="input_y_{{ field }}">
-            <label for="max_width_{{ field }}">Максимальная ширина для "{{ field }}":</label>
-            <input type="number" name="max_width_{{ field }}" id="max_width_{{ field }}" value="200"><br>
-        {% endfor %}
-        <button type="submit" class="btn">Генерировать Сертификаты</button>
-    </form>
-    <script>
-        const draggables = document.querySelectorAll('.draggable');
-        draggables.forEach(el => {
-            el.style.left = '0px';
-            el.style.top = '0px';
-            let offsetX, offsetY;
-            el.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                offsetX = e.clientX - el.getBoundingClientRect().left;
-                offsetY = e.clientY - el.getBoundingClientRect().top;
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+{% extends "layout.html" %}
+
+{% block head %}
+{{ super() }}
+<style>
+    #template {
+        position: relative;
+        margin: auto;
+        background-image: url("{{ url_for('uploaded_file', filename=template_filename) }}");
+        background-size: cover;
+        background-repeat: no-repeat;
+    }
+
+    .draggable {
+        position: absolute;
+        cursor: move;
+        background-color: rgba(255, 255, 0, 0.2); /* Прозрачный желтый фон для удобства размещения */
+        padding: 10px;
+        border: 1px dashed #000;
+        text-align: left;
+        overflow: hidden;
+        word-wrap: break-word; /* Перенос слов, если превышена ширина контейнера */
+    }
+
+    .draggable span {
+        display: inline-block;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>Шаг 5: Расположите поля на шаблоне</h2>
+<div id="template">
+    <img id="template-image" src="{{ url_for('uploaded_file', filename=template_filename) }}" style="display: none;">
+    {% for field in fields %}
+        <div class="draggable" id="{{ field.id }}" data-field-name="{{ field.name }}">
+            <span id="text_{{ field.id }}">{{ field.name }}</span>
+        </div>
+    {% endfor %}
+</div>
+
+<form method="post" class="mt-4">
+    {% for field in fields %}
+        <input type="hidden" name="pos_x_{{ field.id }}" id="input_x_{{ field.id }}" value="0">
+        <input type="hidden" name="pos_y_{{ field.id }}" id="input_y_{{ field.id }}" value="0">
+        <div class="form-group">
+            <label for="max_width_{{ field.id }}">Максимальная ширина для "{{ field.name }}" (в пикселях):</label>
+            <input type="number" name="max_width_{{ field.id }}" id="max_width_{{ field.id }}" value="200" class="form-control">
+        </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-success">Генерировать Сертификаты</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        var templateImage = document.getElementById('template-image');
+
+        // Функция, которая выполнится после загрузки изображения
+        templateImage.onload = function() {
+            var imgWidth = templateImage.naturalWidth;
+            var imgHeight = templateImage.naturalHeight;
+
+            $('#template').css({
+                'width': imgWidth + 'px',
+                'height': imgHeight + 'px'
             });
 
-            function onMouseMove(e) {
-                let x = e.clientX - offsetX - document.getElementById('template').getBoundingClientRect().left;
-                let y = e.clientY - offsetY - document.getElementById('template').getBoundingClientRect().top;
-                el.style.left = x + 'px';
-                el.style.top = y + 'px';
-                document.getElementById('input_x_' + el.id).value = x;
-                document.getElementById('input_y_' + el.id).value = y;
-            }
+            initDraggable();
+        };
 
-            function onMouseUp() {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
+        // Проверяем, загружено ли изображение (на случай кеширования)
+        if (templateImage.complete) {
+            templateImage.onload();
+        }
+
+        // Функция для инициализации draggable элементов
+        function initDraggable() {
+            $('.draggable').each(function() {
+                var safeFieldId = $(this).attr('id');
+                var fieldName = $(this).data('field-name');
+                $(this).draggable({
+                    containment: "#template",
+                    stop: function(event, ui) {
+                        var x = ui.position.left;
+                        var y = $('#template').height() - ui.position.top - $(this).height();
+                        $('#input_x_' + safeFieldId).val(x.toFixed(2));
+                        $('#input_y_' + safeFieldId).val(y.toFixed(2));
+                        console.log(`Поле ${fieldName}: x=${x}, y=${y}`);
+                    }
+                });
+            });
+
+            // Обработчик изменения ширины
+            $('input[id^="max_width_"]').on('input', function() {
+                var safeFieldId = $(this).attr('id').replace('max_width_', '');
+                var width = $(this).val();
+
+                // Обновляем ширину текстового контейнера
+                $('#' + safeFieldId).css('width', width + 'px');
+
+                // Обновляем текст и проверяем переносы в зависимости от ширины
+                var text = $('#' + safeFieldId).find('span').text();
+                var container = $('#' + safeFieldId);
+                simulateTextWrapping(container, text, width);
+
+                console.log(`Поле ${safeFieldId}: установлена ширина ${width}px`);
+            });
+        }
+
+        // Функция для симуляции переноса текста
+        function simulateTextWrapping(container, text, maxWidth) {
+            container.find('span').text('');
+            var words = text.split(' ');
+            var currentLine = '';
+
+            for (let i = 0; i < words.length; i++) {
+                let testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
+                container.find('span').text(testLine);
+
+                if (container.find('span').width() > maxWidth) {
+                    // Если текст шире, чем maxWidth, добавляем текущую строку
+                    container.find('span').append('<br>' + words[i]);
+                    currentLine = words[i];
+                } else {
+                    currentLine = testLine;
+                }
             }
-        });
-    </script>
-    <a href="{{ url_for('index') }}" class="link">На главную</a>
-</body>
-</html>
+        }
+    });
+</script>
+{% endblock %}

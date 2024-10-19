@@ -1,21 +1,8 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Генератор Сертификатов</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <ul class="alerts">
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-    <h1>Добро пожаловать в Генератор Сертификатов</h1>
-    <a href="{{ url_for('upload_template') }}" class="btn">Начать</a>
-</body>
-</html>
+{% extends "layout.html" %}
+{% block content %}
+<div class="jumbotron text-center">
+    <h1 class="display-4">Добро пожаловать!</h1>
+    <p class="lead">Создайте персонализированные сертификаты легко и быстро.</p>
+    <a href="{{ url_for('upload_template') }}" class="btn btn-primary btn-lg">Начать</a>
+</div>
+{% endblock %}
