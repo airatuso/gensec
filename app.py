@@ -65,12 +65,6 @@ def clean_temp_files():
         except Exception as e:
             logging.error(f'Error deleting file {file_path}: {e}')
 
-def register_fonts(font_files):
-    for font_file in font_files:
-        font_path = os.path.join(app.config['UPLOAD_FOLDER'], font_file)
-        font_name = os.path.splitext(font_file)[0]
-        pdfmetrics.registerFont(TTFont(font_name, font_path))
-        logging.info(f'Registered font: {font_name}')
 
 def make_safe_id(field_name):
     # Удаляем все, кроме букв, цифр и подчеркиваний
@@ -209,7 +203,8 @@ def configure_fonts():
                 'color': color
             }
         session['font_configs'] = font_configs
-        # Handle uploaded fonts
+
+        # Обработка загруженных шрифтов пользователем
         uploaded_font = request.files.get('uploaded_font')
         if uploaded_font and allowed_file(uploaded_font.filename, ALLOWED_FONT_EXTENSIONS):
             font_filename = secure_filename(uploaded_font.filename)
@@ -217,16 +212,12 @@ def configure_fonts():
             uploaded_font.save(font_path)
             font_name = os.path.splitext(font_filename)[0]
             fonts = [font_name]  # Only the uploaded font is available
-            register_fonts([font_filename])
-            # Update font configs to use the uploaded font
+            register_fonts([font_filename])  # Можно вызвать для регистрации загруженного шрифта
+            # Обновляем конфигурацию шрифтов для полей
             for field in font_configs:
                 font_configs[field]['font_name'] = font_name
-        else:
-            # Register Manrope fonts
-            for font in fonts:
-                font_file = f'static/fonts/{font}.ttf'
-                font_name = font
-                pdfmetrics.registerFont(TTFont(font_name, font_file))
+
+        session['font_configs'] = font_configs
         return redirect(url_for('position_fields'))
     return render_template('configure_fonts.html', fields=session['selected_columns'], fonts=fonts)
 
@@ -263,6 +254,7 @@ def position_fields():
 def generate_certificates():
     if 'positions' not in session:
         return redirect(url_for('position_fields'))
+
     data_path = os.path.join(app.config['UPLOAD_FOLDER'], session['data_filename'])
     template_path = os.path.join(app.config['UPLOAD_FOLDER'], session['template_filename'])
     df = pd.read_excel(data_path)
@@ -274,6 +266,8 @@ def generate_certificates():
     with Image.open(template_path) as img:
         img_width, img_height = img.size
 
+    logging.info(f"Шаблон загружен с размерами: ширина {img_width}px, высота {img_height}px")
+
     # Генерируем сертификаты
     for index, row in df.iterrows():
         buffer = BytesIO()
@@ -284,17 +278,30 @@ def generate_certificates():
 
         # Рисуем текстовые поля
         for field in fields:
-            value = str(row[field])
+            value = str(row[field]) if pd.notna(row[field]) else ''
             font_name = font_configs[field]['font_name']
             font_size = font_configs[field]['font_size']
             color = font_configs[field]['color']
             x = positions[field]['x']
             y = positions[field]['y']
             max_width = positions[field]['max_width']
-            c.setFont(font_name, font_size)
+
+            if not value:
+                logging.warning(f"Пустое значение для поля '{field}' в строке {index}. Пропуск.")
+                continue
+
+            # Проверяем, зарегистрирован ли шрифт
+            try:
+                c.setFont(font_name, font_size)
+                logging.debug(f"Шрифт '{font_name}' успешно применен для поля '{field}' в строке {index}")
+            except KeyError:
+                logging.error(f"Шрифт '{font_name}' не зарегистрирован. Используется стандартный шрифт.")
+                c.setFont("Helvetica", font_size)
+
             c.setFillColor(HexColor(color))
             text_object = c.beginText()
             text_object.setTextOrigin(x, y)
+
             # Обработка переноса текста
             lines = []
             words = value.split()
@@ -307,36 +314,32 @@ def generate_certificates():
                     lines.append(line)
                     line = word
             lines.append(line)
+
             for line in lines:
                 text_object.textLine(line)
             c.drawText(text_object)
+
         c.save()
         pdf = buffer.getvalue()
         buffer.close()
+
         # Сохраняем PDF
-        participant_name = row[fields[0]]  # Используем первое выбранное поле для имени файла
+        participant_name = str(row[fields[0]]) if pd.notna(row[fields[0]]) else f"unknown_{index}"
         pdf_filename = f"{participant_name}.pdf"
         pdf_path = os.path.join(app.config['CERTIFICATES_FOLDER'], pdf_filename)
         with open(pdf_path, 'wb') as f:
             f.write(pdf)
+        logging.info(f"Сертификат для участника '{participant_name}' успешно создан: {pdf_filename}")
+
     # Создаем ZIP-архив с сертификатами
     shutil.make_archive('certificates', 'zip', app.config['CERTIFICATES_FOLDER'])
+    logging.info("Сертификаты успешно сгенерированы и упакованы в архив certificates.zip")
+
     # Очищаем папку с сертификатами
     shutil.rmtree(app.config['CERTIFICATES_FOLDER'])
     os.makedirs(app.config['CERTIFICATES_FOLDER'])
-    logging.info('Certificates generated successfully.')
     flash('Сертификаты успешно сгенерированы!')
     return send_file('certificates.zip', as_attachment=True)
-
-@app.route('/progress')
-def progress():
-    def generate():
-        x = 0
-        while x <= 100:
-            yield f"data:{x}\n\n"
-            x += 10
-            time.sleep(0.5)
-    return app.response_class(generate(), mimetype='text/event-stream')
 
 @app.errorhandler(413)
 def request_entity_too_large(error):

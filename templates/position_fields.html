@@ -3,11 +3,53 @@
 {% block head %}
 {{ super() }}
 <style>
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-ExtraLight.ttf') }}") format('truetype');
+        font-weight: 200; /* ExtraLight */
+    }
+
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-Light.ttf') }}") format('truetype');
+        font-weight: 300; /* Light */
+    }
+
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-Regular.ttf') }}") format('truetype');
+        font-weight: 400; /* Regular */
+    }
+
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-Medium.ttf') }}") format('truetype');
+        font-weight: 500; /* Medium */
+    }
+
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-SemiBold.ttf') }}") format('truetype');
+        font-weight: 600; /* SemiBold */
+    }
+
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-Bold.ttf') }}") format('truetype');
+        font-weight: 700; /* Bold */
+    }
+
+    @font-face {
+        font-family: 'Manrope';
+        src: url("{{ url_for('static', filename='fonts/Manrope-ExtraBold.ttf') }}") format('truetype');
+        font-weight: 800; /* ExtraBold */
+    }
+
     #template {
         position: relative;
         margin: auto;
         background-image: url("{{ url_for('uploaded_file', filename=template_filename) }}");
-        background-size: cover;
+        background-size: contain;
         background-repeat: no-repeat;
     }
 
@@ -20,11 +62,16 @@
         text-align: left;
         overflow: hidden;
         word-wrap: break-word; /* Перенос слов, если превышена ширина контейнера */
+        transition: width 0.3s ease-in-out, height 0.3s ease-in-out; /* Плавная анимация при изменении ширины */
+        font-family: 'Manrope', Arial, sans-serif;
+        line-height: 1.2; /* Улучшение видимости при переносе */
     }
 
     .draggable span {
         display: inline-block;
         width: 100%;
+        font-family: inherit;
+        white-space: pre-wrap; /* Позволяет тексту переноситься, при этом не сжимая строки */
     }
 </style>
 {% endblock %}
@@ -39,7 +86,6 @@
         </div>
     {% endfor %}
 </div>
-
 <form method="post" class="mt-4">
     {% for field in fields %}
         <input type="hidden" name="pos_x_{{ field.id }}" id="input_x_{{ field.id }}" value="0">
@@ -58,7 +104,7 @@
     $(document).ready(function() {
         var templateImage = document.getElementById('template-image');
 
-        // Функция, которая выполнится после загрузки изображения
+        // Устанавливаем размеры контейнера шаблона после загрузки изображения
         templateImage.onload = function() {
             var imgWidth = templateImage.naturalWidth;
             var imgHeight = templateImage.naturalHeight;
