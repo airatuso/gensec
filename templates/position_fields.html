@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Расположение Полей</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        #template {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-image: url("{{ url_for('static', filename='uploads/' + template_filename) }}");
+            background-size: cover;
+            margin: auto;
+        }
+        .draggable {
+            position: absolute;
+            cursor: move;
+            background-color: rgba(255, 255, 255, 0.5);
+            padding: 5px;
+            border: 1px dashed #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Расположите Поля на Шаблоне</h1>
+    <div id="template">
+        {% for field in fields %}
+            <div class="draggable" id="{{ field }}">{{ field }}</div>
+        {% endfor %}
+    </div>
+    <form method="post">
+        {% for field in fields %}
+            <input type="hidden" name="pos_x_{{ field }}" id="input_x_{{ field }}">
+            <input type="hidden" name="pos_y_{{ field }}" id="input_y_{{ field }}">
+            <label for="max_width_{{ field }}">Максимальная ширина для "{{ field }}":</label>
+            <input type="number" name="max_width_{{ field }}" id="max_width_{{ field }}" value="200"><br>
+        {% endfor %}
+        <button type="submit" class="btn">Генерировать Сертификаты</button>
+    </form>
+    <script>
+        const draggables = document.querySelectorAll('.draggable');
+        draggables.forEach(el => {
+            el.style.left = '0px';
+            el.style.top = '0px';
+            let offsetX, offsetY;
+            el.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                offsetX = e.clientX - el.getBoundingClientRect().left;
+                offsetY = e.clientY - el.getBoundingClientRect().top;
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            function onMouseMove(e) {
+                let x = e.clientX - offsetX - document.getElementById('template').getBoundingClientRect().left;
+                let y = e.clientY - offsetY - document.getElementById('template').getBoundingClientRect().top;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                document.getElementById('input_x_' + el.id).value = x;
+                document.getElementById('input_y_' + el.id).value = y;
+            }
+
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+        });
+    </script>
+    <a href="{{ url_for('index') }}" class="link">На главную</a>
+</body>
+</html>
