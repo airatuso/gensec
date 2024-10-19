@@ -1,17 +1,12 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Загрузить Данные</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <h1>Загрузите Excel Таблицу с Участниками</h1>
-    <form method="post" enctype="multipart/form-data">
-        <input type="file" name="data_file" accept=".xls, .xlsx" required>
-        <p>Поддерживаемые форматы: XLS, XLSX. Максимальный размер файла: 16 МБ.</p>
-        <button type="submit" class="btn">Далее</button>
-    </form>
-    <a href="{{ url_for('index') }}" class="link">На главную</a>
-</body>
-</html>
+{% extends "layout.html" %}
+{% block content %}
+<h2>Шаг 2: Загрузите данные участников</h2>
+<form method="post" enctype="multipart/form-data" class="mt-4">
+    <div class="form-group">
+        <label for="data_file">Выберите Excel файл с данными:</label>
+        <input type="file" name="data_file" accept=".xls, .xlsx" required class="form-control-file">
+        <small class="form-text text-muted">Поддерживаемые форматы: XLS, XLSX. Максимальный размер файла: 16 МБ.</small>
+    </div>
+    <button type="submit" class="btn btn-success">Далее</button>
+</form>
+{% endblock %}

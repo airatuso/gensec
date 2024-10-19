@@ -1,18 +1,15 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Выберите Столбцы</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <h1>Выберите Поля для Сертификата</h1>
-    <form method="post">
+{% extends "layout.html" %}
+{% block content %}
+<h2>Шаг 3: Выберите поля для сертификата</h2>
+<form method="post" class="mt-4">
+    <div class="form-group">
         {% for column in columns %}
-            <input type="checkbox" name="columns" value="{{ column }}"> {{ column }}<br>
+            <div class="form-check">
+                <input type="checkbox" name="columns" value="{{ column }}" class="form-check-input" id="column_{{ loop.index }}">
+                <label class="form-check-label" for="column_{{ loop.index }}">{{ column }}</label>
+            </div>
         {% endfor %}
-        <button type="submit" class="btn">Далее</button>
-    </form>
-    <a href="{{ url_for('index') }}" class="link">На главную</a>
-</body>
-</html>
+    </div>
+    <button type="submit" class="btn btn-success">Далее</button>
+</form>
+{% endblock %}

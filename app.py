@@ -1,21 +1,21 @@
 # app.py
-import os
 import logging
-import uuid
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session
-from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
-import pandas as pd
-from flask import jsonify
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.lib.pagesizes import A4, landscape, portrait
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.colors import HexColor
-from reportlab.platypus import Image as RLImage
-from io import BytesIO
-from PIL import Image
+import os
+import re
 import shutil
+import time
+from io import BytesIO
+import uuid
+import pandas as pd
+from PIL import Image
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session
+from flask import send_from_directory
+from reportlab.lib.colors import HexColor
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+from werkzeug.utils import secure_filename
 
 load_dotenv()
 
@@ -23,11 +23,17 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
 # Configure logging
-logging.basicConfig(filename='app.log', level=logging.INFO,
-                    format='%(asctime)s %(levelname)s %(message)s')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("app.log", encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
 
 # File upload configurations
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 CERTIFICATES_FOLDER = 'certificates'
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 ALLOWED_EXCEL_EXTENSIONS = {'xls', 'xlsx'}
@@ -45,8 +51,8 @@ if not os.path.exists(CERTIFICATES_FOLDER):
 
 # Helper functions
 def allowed_file(filename, allowed_extensions):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in allowed_extensions
+    ext = os.path.splitext(filename)[1].lower()
+    return ext[1:] in allowed_extensions  # Убираем точку перед проверкой
 
 def clean_temp_files():
     folder = app.config['UPLOAD_FOLDER']
@@ -66,6 +72,38 @@ def register_fonts(font_files):
         pdfmetrics.registerFont(TTFont(font_name, font_path))
         logging.info(f'Registered font: {font_name}')
 
+def make_safe_id(field_name):
+    # Удаляем все, кроме букв, цифр и подчеркиваний
+    return re.sub(r'\W|^(?=\d)', '_', field_name)
+
+
+def register_fonts():
+    fonts = [
+        'Manrope-ExtraLight', 'Manrope-Light', 'Manrope-Regular',
+        'Manrope-Medium', 'Manrope-SemiBold', 'Manrope-Bold', 'Manrope-ExtraBold'
+    ]
+
+    # Путь к папке с шрифтами
+    fonts_path = os.path.join(app.root_path, 'static', 'fonts')
+
+    # Регистрируем каждый шрифт
+    for font in fonts:
+        font_file = f"{font}.ttf"
+        font_path = os.path.join(fonts_path, font_file)
+        if os.path.exists(font_path):
+            try:
+                pdfmetrics.registerFont(TTFont(font, font_path))
+                logging.info(f"Registered font: {font} from {font_path}")
+            except Exception as e:
+                logging.error(f"Failed to register font {font}: {e}")
+        else:
+            logging.warning(f"Font file not found: {font_path}")
+
+
+# Вызываем функцию регистрации шрифтов при запуске приложения
+register_fonts()
+
+
 @app.route('/')
 def index():
     clean_temp_files()
@@ -77,11 +115,33 @@ def upload_template():
     if request.method == 'POST':
         template = request.files.get('template')
         if template and allowed_file(template.filename, ALLOWED_IMAGE_EXTENSIONS):
-            filename = secure_filename(template.filename)
+            # Получаем оригинальное имя файла
+            original_filename = template.filename
+            logging.debug(f"Original template filename: {original_filename}")
+
+            # Применяем secure_filename
+            filename = secure_filename(original_filename)
+            logging.debug(f"Secure filename: {filename}")
+
+            # Получаем расширение файла
+            ext = os.path.splitext(filename)[1]
+            if not ext:
+                # Если расширение отсутствует, используем расширение из оригинального имени
+                ext = os.path.splitext(original_filename)[1]
+                if not ext:
+                    # Если в оригинальном имени тоже нет расширения, используем '.png' по умолчанию
+                    ext = '.png'
+                filename += ext
+
+            # Если после secure_filename имя файла пустое или начинается с точки
+            if not filename or filename.startswith('.'):
+                # Генерируем уникальное имя файла
+                filename = f"template_{uuid.uuid4().hex}{ext}"
+
             template_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             template.save(template_path)
             session['template_filename'] = filename
-            logging.info('Template image uploaded successfully.')
+            logging.info(f'Template image uploaded successfully as {filename}.')
             return redirect(url_for('upload_data'))
         else:
             flash('Неверный формат файла. Пожалуйста, загрузите изображение в формате PNG или JPG.')
@@ -105,6 +165,10 @@ def upload_data():
             flash('Неверный формат файла. Пожалуйста, загрузите Excel файл.')
             return redirect(request.url)
     return render_template('upload_data.html')
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/select_columns', methods=['GET', 'POST'])
 def select_columns():
@@ -173,13 +237,27 @@ def position_fields():
     if request.method == 'POST':
         positions = {}
         for field in session['selected_columns']:
-            x = float(request.form.get(f'pos_x_{field}', 0))
-            y = float(request.form.get(f'pos_y_{field}', 0))
-            max_width = float(request.form.get(f'max_width_{field}', 200))
+            safe_field = make_safe_id(field)
+            x_value = request.form.get(f'pos_x_{safe_field}', '0')
+            y_value = request.form.get(f'pos_y_{safe_field}', '0')
+            max_width_value = request.form.get(f'max_width_{safe_field}', '200')
+            logging.debug(f'Получены данные для поля {field}: x={x_value}, y={y_value}, max_width={max_width_value}')
+            try:
+                x = float(x_value)
+                y = float(y_value)
+                max_width = float(max_width_value)
+            except ValueError as e:
+                logging.error(f'Ошибка преобразования данных для поля {field}: {e}')
+                flash(f'Некорректные данные для поля {field}. Пожалуйста, введите числовые значения.')
+                return redirect(request.url)
             positions[field] = {'x': x, 'y': y, 'max_width': max_width}
         session['positions'] = positions
+        logging.info('Позиции полей успешно сохранены.')
         return redirect(url_for('generate_certificates'))
-    return render_template('position_fields.html', fields=session['selected_columns'], template_filename=session['template_filename'])
+    # Генерируем список полей с безопасными идентификаторами
+    fields = [{'name': field, 'id': make_safe_id(field)} for field in session['selected_columns']]
+    return render_template('position_fields.html', fields=fields, template_filename=session['template_filename'])
+
 
 @app.route('/generate_certificates', methods=['GET'])
 def generate_certificates():
@@ -191,20 +269,20 @@ def generate_certificates():
     fields = session['selected_columns']
     font_configs = session['font_configs']
     positions = session['positions']
-    # Determine page orientation
+
+    # Открываем изображение, чтобы получить его размеры
     with Image.open(template_path) as img:
-        width, height = img.size
-    if width > height:
-        page_size = landscape(A4)
-    else:
-        page_size = portrait(A4)
-    # Generate certificates
+        img_width, img_height = img.size
+
+    # Генерируем сертификаты
     for index, row in df.iterrows():
         buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=page_size)
-        # Draw background image
-        c.drawImage(template_path, 0, 0, width=page_size[0], height=page_size[1])
-        # Draw text fields
+        c = canvas.Canvas(buffer, pagesize=(img_width, img_height))
+
+        # Рисуем фоновое изображение
+        c.drawImage(template_path, 0, 0, width=img_width, height=img_height)
+
+        # Рисуем текстовые поля
         for field in fields:
             value = str(row[field])
             font_name = font_configs[field]['font_name']
@@ -217,7 +295,7 @@ def generate_certificates():
             c.setFillColor(HexColor(color))
             text_object = c.beginText()
             text_object.setTextOrigin(x, y)
-            # Handle text wrapping
+            # Обработка переноса текста
             lines = []
             words = value.split()
             line = ''
@@ -235,19 +313,30 @@ def generate_certificates():
         c.save()
         pdf = buffer.getvalue()
         buffer.close()
-        # Save PDF
-        participant_name = row[fields[0]]  # Assuming the first selected field is the name
+        # Сохраняем PDF
+        participant_name = row[fields[0]]  # Используем первое выбранное поле для имени файла
         pdf_filename = f"{participant_name}.pdf"
         pdf_path = os.path.join(app.config['CERTIFICATES_FOLDER'], pdf_filename)
         with open(pdf_path, 'wb') as f:
             f.write(pdf)
-    # Create zip archive
+    # Создаем ZIP-архив с сертификатами
     shutil.make_archive('certificates', 'zip', app.config['CERTIFICATES_FOLDER'])
-    # Clear certificates folder
+    # Очищаем папку с сертификатами
     shutil.rmtree(app.config['CERTIFICATES_FOLDER'])
     os.makedirs(app.config['CERTIFICATES_FOLDER'])
     logging.info('Certificates generated successfully.')
+    flash('Сертификаты успешно сгенерированы!')
     return send_file('certificates.zip', as_attachment=True)
+
+@app.route('/progress')
+def progress():
+    def generate():
+        x = 0
+        while x <= 100:
+            yield f"data:{x}\n\n"
+            x += 10
+            time.sleep(0.5)
+    return app.response_class(generate(), mimetype='text/event-stream')
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
