@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Настройка Шрифтов</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Настройте Шрифты и Цвета</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% for field in fields %}
+            <h3>Поле: {{ field }}</h3>
+            <label for="font_{{ field }}">Шрифт:</label>
+            <select name="font_{{ field }}" id="font_{{ field }}">
+                {% for font in fonts %}
+                    <option value="{{ font }}">{{ font }}</option>
+                {% endfor %}
+            </select><br>
+            <label for="font_size_{{ field }}">Размер шрифта:</label>
+            <input type="number" name="font_size_{{ field }}" id="font_size_{{ field }}" value="12"><br>
+            <label for="color_{{ field }}">Цвет:</label>
+            <input type="color" name="color_{{ field }}" id="color_{{ field }}" value="#000000"><br>
+        {% endfor %}
+        <h3>Загрузите свой шрифт (опционально):</h3>
+        <input type="file" name="uploaded_font" accept=".ttf, .otf"><br>
+        <button type="submit" class="btn">Далее</button>
+    </form>
+    <a href="{{ url_for('index') }}" class="link">На главную</a>
+</body>
+</html>
