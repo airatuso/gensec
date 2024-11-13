@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import shutil
-import time
 from io import BytesIO
 import uuid
 import pandas as pd
@@ -347,4 +346,4 @@ def request_entity_too_large(error):
     return redirect(request.url)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
